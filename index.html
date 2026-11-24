@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>ڈچ لائن ڈیلیوری</title>
+<meta name="theme-color" content="#1F4E3D">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box} body{margin:0;font-family:'Noto Nastaliq Urdu',Roboto,Arial,sans-serif;line-height:1.9;background:#f3f5f4;color:#1b1f1d}
+  header{padding-top:max(12px,env(safe-area-inset-top));position:sticky;top:0;background:#1F4E3D;color:#fff;padding:12px 14px;z-index:2}
+  header h1{font-size:17px;margin:0} header .sub{font-size:13px;opacity:.85;margin-top:2px}
+  .bar{height:6px;background:rgba(255,255,255,.25);border-radius:3px;margin-top:8px}
+  .bar i{display:block;height:100%;background:#9fe0b8;border-radius:3px;width:0}
+  .wrap{padding:10px}
+  .card{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.08);border-inline-start:6px solid #ccc}
+  .card.done{border-inline-start-color:#2e9e5b} .card.absent{border-inline-start-color:#d9822b} .card.wait{border-inline-start-color:#999;opacity:.85}
+  .top{display:flex;justify-content:space-between;gap:8px} .nm{font-weight:600;font-size:16px}
+  .st{font-size:12px;color:#666;white-space:nowrap} .addr{font-size:13px;color:#555;margin:4px 0 8px}
+  .links a{font-size:13px;margin-right:14px;color:#1F4E3D;font-weight:600;text-decoration:none}
+  .row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .qty{display:flex;align-items:center;border:1px solid #ccd;border-radius:8px;overflow:hidden}
+  .qty button{width:40px;height:42px;border:0;background:#eef;font-size:20px}
+  .qty{direction:ltr} .qty input{width:62px;height:42px;border:0;text-align:center;font-size:17px}
+  .btn{font-family:inherit;height:46px;border:0;border-radius:8px;padding:0 14px;font-size:15px;font-weight:600}
+  .ok{background:#2e9e5b;color:#fff;flex:1} .ab{background:#fbe3cc;color:#8a4b0f} .mo{background:#e8ecea;color:#333}
+  .status{font-size:13px;margin-top:8px;font-weight:600} .status.g{color:#2e9e5b} .status.o{color:#b9650f} .status.w{color:#777}
+  .login{max-width:360px;margin:40px auto;background:#fff;border-radius:12px;padding:20px}
+  .login select,.login input{width:100%;height:46px;font-size:16px;margin:8px 0 14px;border:1px solid #ccd;border-radius:8px;padding:0 10px}
+  .login .btn{width:100%;background:#1F4E3D;color:#fff}
+  .err{color:#b00020;font-size:14px;min-height:18px}
+  .filter{display:flex;gap:6px;margin-bottom:10px} .filter button{font-family:inherit;flex:1;height:36px;border:1px solid #ccd;background:#fff;border-radius:18px}
+  .filter button.on{background:#1F4E3D;color:#fff;border-color:#1F4E3D}
+  .out{color:#fff;background:transparent;border:1px solid rgba(255,255,255,.6);border-radius:6px;font-size:12px;padding:3px 8px;float:left;font-family:inherit}
+</style></head>
+<body>
+<div id="app"><div class="login">لوڈ ہو رہا ہے…</div></div>
+<script>
+var S = {name:'', pin:'', today:'', stops:[], filter:'todo'};
+var Q = JSON.parse(localStorage.getItem('dd_queue') || '[]');
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+var API = 'https://script.google.com/macros/s/AKfycbyzcRip7H28PEpD1ydWdPA8v1YK0zRVYtMl2FsXJ2WSpH1mVjCgFaRLPwFsnife0p3d/exec';
+var ACT = {appDrivers:'drivers', appLogin:'login', appSave:'save'};
+function run(fn,args,ok,bad){
+  bad = bad || function(e){ alert(e.message||e); };
+  var b = {action: ACT[fn]};
+  if (fn==='appLogin' || fn==='appSave') { b.name=args[0]; b.pin=args[1]; }
+  if (fn==='appSave') b.rec=args[2];
+  fetch(API, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(b)})
+    .then(function(r){ return r.json(); })
+    .then(function(j){ if (j.ok) ok(j.data); else bad({message:j.error||'ERROR'}); })
+    .catch(function(){ bad({message:'NET'}); });
+}
+
+function start(){
+  var saved = JSON.parse(localStorage.getItem('dd_login') || 'null');
+  if (saved) { S.name = saved.name; S.pin = saved.pin; load(); return; }
+  run('appDrivers', [], showLogin, function(){ $('app').innerHTML='<div class="login">انٹرنیٹ نہیں ہے۔ <button class="btn mo" onclick="location.reload()">دوبارہ کوشش</button></div>'; });
+}
+function showLogin(names, msg){
+  var o = (names||[]).map(function(n){return '<option>'+esc(n)+'</option>';}).join('');
+  $('app').innerHTML = '<div class="login"><h2 style="margin-top:0">ڈچ لائن ڈیلیوری</h2>'+
+    '<label>ڈرائیور</label><select id="nm">'+o+'</select><label>پن کوڈ</label>'+
+    '<input id="pin" type="password" inputmode="numeric" maxlength="8">'+
+    '<div class="err" id="err">'+esc(msg||'')+'</div><button class="btn" onclick="doLogin()">شروع کریں</button></div>';
+}
+function doLogin(){
+  S.name = $('nm').value; S.pin = $('pin').value; $('err').textContent='چیک ہو رہا ہے…';
+  run('appLogin',[S.name,S.pin],function(r){ localStorage.setItem('dd_login', JSON.stringify({name:S.name,pin:S.pin})); got(r); },
+      function(e){ var m=e.message||''; $('err').textContent = m.indexOf('LOCKED')>=0 ? 'بہت زیادہ غلط کوششیں۔ 15 منٹ بعد دوبارہ کریں۔' : (m.indexOf('PIN')>=0 ? 'نام یا پن کوڈ غلط ہے' : 'انٹرنیٹ نہیں ہے'); });
+}
+function logout(){ localStorage.removeItem('dd_login'); location.reload(); }
+function load(){
+  run('appLogin',[S.name,S.pin],got,function(e){
+    if ((e.message||'').indexOf('PIN')>=0) { localStorage.removeItem('dd_login'); run('appDrivers',[],function(n){showLogin(n,'دوبارہ لاگ اِن کریں');}); }
+    else { var c = JSON.parse(localStorage.getItem('dd_route')||'null'); if (c) { got(c, true); } else $('app').innerHTML='<div class="login">انٹرنیٹ نہیں ہے۔ <button class="btn mo" onclick="location.reload()">دوبارہ کوشش</button></div>'; }
+  });
+}
+function got(r, offline){
+  S.today = r.today; S.stops = r.stops;
+  localStorage.setItem('dd_route', JSON.stringify(r));
+  Q.forEach(function(q){ var s = find(q.id); if (s && q.date===S.today) mark(s,q,true); });
+  render(offline); flush();
+}
+function find(id){ for (var i=0;i<S.stops.length;i++) if (String(S.stops[i].id)===String(id)) return S.stops[i]; }
+function mark(s,q,waiting){
+  s.today = s.today || {status:'',litres:0,extra:0};
+  if (q.status==='Extra') s.today.extra += Number(q.litres); else { s.today.status=q.status; s.today.litres=Number(q.litres); }
+  s.wait = waiting;
+}
+function render(offline){
+  var done=0; S.stops.forEach(function(s){ if (s.today && s.today.status) done++; });
+  var list = S.stops.filter(function(s){ var d = s.today && s.today.status; return S.filter==='all' || (S.filter==='todo' ? !d : d); });
+  var d = S.today.split('-');
+  var h = '<header><button class="out" onclick="logout()">لاگ آؤٹ</button><button class="out" style="margin-left:6px" onclick="load()">↻ تازہ کریں</button><h1>'+esc(S.name)+' · '+d[2]+'/'+d[1]+'/'+d[0]+'</h1>'+
+    '<div class="sub">'+S.stops.length+' میں سے '+done+' مکمل'+(Q.length?' · '+Q.length+' بھیجنا باقی':'')+(offline?' · آف لائن':'')+'</div>'+
+    '<div class="bar"><i style="width:'+(S.stops.length?Math.round(done*100/S.stops.length):0)+'%"></i></div></header><div class="wrap">'+
+    '<div class="filter">'+['todo','done','all'].map(function(f){return '<button class="'+(S.filter===f?'on':'')+'" onclick="S.filter=\''+f+'\';render()">'+{todo:'باقی',done:'مکمل',all:'سب'}[f]+'</button>';}).join('')+'</div>';
+  if (!S.stops.length) h += '<div class="card">آپ کے روٹ پر ابھی کوئی گاہک نہیں۔ دفتر سے رابطہ کریں۔</div>';
+  list.forEach(function(s){
+    var t = s.today, cls = s.wait ? 'wait' : (t && t.status==='Absent' ? 'absent' : (t && t.status ? 'done' : ''));
+    var where = s.map || s.address;
+    var st = '';
+    if (t && t.status) st = '<div class="status '+(s.wait?'w':(t.status==='Absent'?'o':'g'))+'">'+(t.status==='Absent'?'غیر حاضر':t.litres+' لیٹر دیا')+(t.extra?' + اضافی '+t.extra+' لیٹر':'')+(s.wait?' · سگنل کا انتظار':' ✓')+'</div>';
+    var q = t && t.status==='Delivered' ? t.litres : s.usual;
+    h += '<div class="card '+cls+'" id="c'+esc(s.id)+'"><div class="top"><div class="nm">'+esc(s.name)+'</div><div class="st">اسٹاپ '+(s.stop<9999?s.stop:'–')+' · کوڈ '+esc(s.id)+'</div></div>'+
+      '<div class="addr">'+esc(s.address)+'</div><div class="links">'+
+      (where?'<a href="https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(where)+'" target="_blank">راستہ</a>':'')+
+      (s.phone?'<a href="tel:'+esc(s.phone)+'">کال</a>':'')+'</div>'+
+      '<div class="row"><div class="qty"><button onclick="step(\''+esc(s.id)+'\',-0.5)">−</button><input id="q'+esc(s.id)+'" type="number" step="0.5" min="0" inputmode="decimal" value="'+q+'"><button onclick="step(\''+esc(s.id)+'\',0.5)">+</button></div>'+
+      '<button class="btn ok" onclick="save(\''+esc(s.id)+'\',\'Delivered\')">دے دیا</button></div>'+
+      '<div class="row"><button class="btn ab" onclick="save(\''+esc(s.id)+'\',\'Absent\')">غیر حاضر</button>'+
+      '<button class="btn mo" onclick="extra(\''+esc(s.id)+'\')">اضافی دودھ</button><button class="btn mo" onclick="note(\''+esc(s.id)+'\')">نوٹ</button></div>'+st+'</div>';
+  });
+  $('app').innerHTML = h + '</div>';
+}
+function step(id,d){ var i=$('q'+id); i.value = Math.max(0, (Number(i.value)||0)+d); }
+function extra(id){ var l = prompt('اضافی دودھ کتنے لیٹر دیا؟','0.5'); if (l && Number(l)>0) save(id,'Extra',Number(l)); }
+function note(id){ var n = prompt('دفتر کے لیے نوٹ:'); if (n) save(id,'Note',0,n); }
+function gps(cb){
+  if (!navigator.geolocation) return cb('');
+  var done=false; setTimeout(function(){ if(!done){done=true;cb('');} }, 6000);
+  navigator.geolocation.getCurrentPosition(function(p){ if(!done){done=true;cb(p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6));} },
+    function(){ if(!done){done=true;cb('');} }, {enableHighAccuracy:true,timeout:5000,maximumAge:60000});
+}
+function save(id,status,litres,noteText){
+  var s = find(id); if (!s) return;
+  if (status==='Note') { status = (s.today && s.today.status) || 'Delivered'; litres = s.today && s.today.status ? s.today.litres : Number($('q'+id).value)||0; }
+  if (status==='Delivered' && litres===undefined) litres = Number($('q'+id).value)||0;
+  if (status==='Absent') litres = 0;
+  var now = new Date(), hh=('0'+now.getHours()).slice(-2), mm=('0'+now.getMinutes()).slice(-2);
+  gps(function(g){
+    var rec = {id:id, status:status, litres:litres, note:noteText||'', gps:g, date:S.today, time:hh+':'+mm, key:Date.now()+'-'+id};
+    Q.push(rec); localStorage.setItem('dd_queue', JSON.stringify(Q));
+    mark(s,rec,true); render(); flush();
+  });
+}
+var busy=false;
+function flush(){
+  if (busy || !Q.length) return; busy=true;
+  var rec = Q[0];
+  run('appSave',[S.name,S.pin,rec],function(){
+    Q.shift(); localStorage.setItem('dd_queue', JSON.stringify(Q)); busy=false;
+    var s=find(rec.id); if (s && !Q.some(function(q){return q.id===rec.id;})) s.wait=false;
+    render(); flush();
+  }, function(e){ busy=false; if ((e.message||'').indexOf('PIN')>=0) { alert('آپ کا پن کوڈ بدل گیا ہے۔ دوبارہ لاگ اِن کریں۔'); logout(); } });
+}
+setInterval(flush, 20000); window.addEventListener('online', flush);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+start();
+</script></body></html>
