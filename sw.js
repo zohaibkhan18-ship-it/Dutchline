@@ -1,5 +1,5 @@
 // Dutchline driver app – keeps the app opening even without signal. Data calls always go to the network.
-const CACHE = 'dutchline-v3';
+const CACHE = 'dutchline-v4';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'logo-wordmark.png', 'logo-full.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
