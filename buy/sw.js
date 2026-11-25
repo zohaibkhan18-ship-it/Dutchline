@@ -1,5 +1,5 @@
 // Dutchline Purchases app - bump the version on every change
-const C = 'dl-buy-v3';
+const C = 'dl-buy-v4';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(['./', './index.html', './manifest.json', '../icon-192.png', '../logo-wordmark.png']).catch(() => {})));
   self.skipWaiting();
